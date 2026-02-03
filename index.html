@@ -68,7 +68,10 @@
             cursor: pointer; 
             font-weight: bold; 
             font-size: 14px;
+            /* Clear lint error by adding standard property */
+            appearance: none;
             -webkit-appearance: none; 
+            -moz-appearance: none; /* Optional: for older Firefox versions */
             touch-action: manipulation;
             user-select: none;
         }

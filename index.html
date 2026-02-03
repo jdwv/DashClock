@@ -12,7 +12,7 @@
             overflow: hidden; 
             background: #121212; 
             color: white; 
-            font-family: sans-serif; 
+            font-family: monospace; 
         }
 
         #container { 
@@ -21,72 +21,96 @@
             height: 100dvh; 
         }
 
-        /* Clock area shrunk to 25% height */
-        #clock-area { 
-            height: 25%; 
+        #top-bar { 
+            height: 20dvh; 
             display: flex; 
-            flex-direction: column;
             align-items: center; 
             justify-content: center; 
             background: #1a1a1a; 
-            border-bottom: 2px solid #333; 
+            border-bottom: 1px solid #333;
+            font-size: 7vw; 
+            color: #00ff00;
+            gap: 15px;
         }
 
-        #clock { font-size: 15vw; font-weight: bold; font-family: monospace; color: #00ff00; line-height: 1; }
-        /* Date slightly increased from 2vw to 3vw */
-        #date { font-size: 3vw; font-weight: normal; font-family: monospace; color: #888; margin-top: 5px; text-transform: uppercase; }
+        #date { color: #888; }
 
         #drawing-area { 
             flex-grow: 1; 
             position: relative; 
             background: #121212; 
+            touch-action: none;
         }
 
         canvas { 
-            display: block;
+            display: block; 
             width: 100%; 
             height: 100%; 
-            touch-action: none; 
-            z-index: 1; 
         }
 
         #controls { 
             position: fixed; 
             bottom: 20px; 
             right: 20px; 
-            z-index: 9999; 
-            display: flex;
-            gap: 10px;
+            z-index: 100; 
+            display: flex; 
+            gap: 12px; 
         }
 
         button { 
-            padding: 14px 22px; 
+            padding: 12px 20px; 
             background: #333; 
             color: white; 
             border: 1px solid #555; 
             border-radius: 8px; 
-            cursor: pointer; 
             font-weight: bold; 
             font-size: 14px;
-            /* Clear lint error by adding standard property */
             appearance: none;
-            -webkit-appearance: none; 
-            -moz-appearance: none; /* Optional: for older Firefox versions */
+            -webkit-appearance: none;
             touch-action: manipulation;
-            user-select: none;
         }
 
-        #clear-btn { background: #cc0000; border-color: #ff4444; }
+        #clear-btn { background: #aa0000; border-color: #660000; }
+        button:active { opacity: 0.7; }
 
-        button:active { opacity: 0.8; }
+        /* Custom Modal Styles */
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #modal {
+            background: #1a1a1a;
+            padding: 30px;
+            border: 1px solid #444;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .confirm-btn { background: #aa0000; border: none; }
+        .cancel-btn { background: #444; border: none; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <div id="clock-area">
-        <div id="clock">00:00:00</div>
-        <div id="date">01-Jan-1970</div>
+    <div id="top-bar">
+        <span id="clock">00:00:00</span>
+        <span id="divider">/</span>
+        <span id="date">01-JAN</span>
     </div>
 
     <div id="drawing-area">
@@ -95,8 +119,18 @@
 </div>
 
 <div id="controls">
-    <button id="fullscreen-btn">Full Screen</button>
-    <button id="clear-btn">Clear Notes</button>
+    <button id="fs-btn">FULLSCREEN</button>
+    <button id="clear-btn">CLEAR</button>
+</div>
+
+<div id="modal-overlay">
+    <div id="modal">
+        <div style="font-size: 1.2rem; margin-bottom: 10px;">Clear all notes?</div>
+        <div class="modal-btns">
+            <button class="confirm-btn" id="modal-yes">YES, CLEAR</button>
+            <button class="cancel-btn" id="modal-no">CANCEL</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -104,100 +138,110 @@
     const ctx = canvas.getContext('2d');
     const clockEl = document.getElementById('clock');
     const dateEl = document.getElementById('date');
+    const overlay = document.getElementById('modal-overlay');
     let drawing = false;
 
     function updateDisplay() {
         const now = new Date();
-        clockEl.textContent = now.toLocaleTimeString('en-AU', { hour12: false });
+        clockEl.textContent = now.toLocaleTimeString('en-AU', { 
+            hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
         const day = String(now.getDate()).padStart(2, '0');
-        const month = now.toLocaleString('en-AU', { month: 'short' });
-        const year = now.getFullYear();
-        dateEl.textContent = `${day}-${month}-${year}`;
+        const month = now.toLocaleString('en-AU', { month: 'short' }).toUpperCase();
+        dateEl.textContent = `${day}-${month}`;
     }
     setInterval(updateDisplay, 1000);
     updateDisplay();
 
-    function setupCanvasStyles() {
+    function setupStyles() {
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 4;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
     }
 
-    function saveCanvas() {
-        localStorage.setItem('savedDrawing', canvas.toDataURL());
-    }
-
-    function loadCanvas() {
-        const dataURL = localStorage.getItem('savedDrawing');
-        if (dataURL) {
-            const img = new Image();
-            img.onload = () => ctx.drawImage(img, 0, 0);
-            img.src = dataURL;
-        }
-    }
-
     function resize() {
-        const tempImage = canvas.toDataURL();
-        canvas.width = canvas.offsetWidth;
-        canvas.height = canvas.offsetHeight;
-        setupCanvasStyles();
+        const temp = canvas.toDataURL();
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        setupStyles();
         const img = new Image();
         img.onload = () => ctx.drawImage(img, 0, 0);
-        img.src = tempImage;
+        img.src = temp;
     }
 
     window.addEventListener('resize', resize);
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    setupCanvasStyles();
-    loadCanvas();
+    resize();
 
-    function start(e) { drawing = true; draw(e); }
-    function stop() { 
-        if (drawing) {
-            drawing = false; 
-            ctx.beginPath(); 
-            saveCanvas(); 
-        }
+    const saved = localStorage.getItem('dash_draw');
+    if (saved) {
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0);
+        img.src = saved;
     }
 
-    function draw(e) {
-        if (!drawing) return;
+    function getPos(e) {
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
-        const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
-        ctx.lineTo(x, y);
-        ctx.stroke();
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function start(e) {
+        if (e.target !== canvas) return;
+        drawing = true;
+        const pos = getPos(e);
         ctx.beginPath();
-        ctx.moveTo(x, y);
+        ctx.moveTo(pos.x, pos.y);
+    }
+
+    function move(e) {
+        if (!drawing) return;
+        const pos = getPos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+    }
+
+    function end() {
+        if (drawing) {
+            drawing = false;
+            localStorage.setItem('dash_draw', canvas.toDataURL());
+        }
     }
 
     canvas.addEventListener('pointerdown', start);
-    window.addEventListener('pointermove', draw);
-    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
 
-    // Clear Logic
-    document.getElementById('clear-btn').addEventListener('pointerdown', (e) => {
+    // --- Modal Logic ---
+    document.getElementById('clear-btn').addEventListener('click', (e) => {
         e.stopPropagation();
-        if (confirm("Clear all notes?")) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            localStorage.removeItem('savedDrawing');
-        }
+        overlay.style.display = 'flex';
     });
 
-    // Full Screen Logic
-    document.getElementById('fullscreen-btn').addEventListener('click', (e) => {
+    document.getElementById('modal-no').addEventListener('click', () => {
+        overlay.style.display = 'none';
+    });
+
+    document.getElementById('modal-yes').addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        localStorage.removeItem('dash_draw');
+        overlay.style.display = 'none';
+    });
+
+    // --- Fullscreen Logic ---
+    document.getElementById('fs-btn').addEventListener('click', (e) => {
         e.stopPropagation();
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => {
-                alert(`Error: ${err.message}`);
-            });
+            document.documentElement.requestFullscreen().catch(() => {});
         } else {
             document.exitFullscreen();
         }
     });
-</script>
 
+    document.getElementById('controls').addEventListener('pointerdown', (e) => e.stopPropagation());
+    overlay.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+</script>
 </body>
 </html>

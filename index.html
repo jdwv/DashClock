@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Desk Dashboard</title>
     <style>
-        /* Using dvh (Dynamic Viewport Height) to handle Chrome's auto-hiding address bar */
         body, html { 
             margin: 0; 
             padding: 0; 
@@ -22,9 +21,9 @@
             height: 100dvh; 
         }
 
-        /* Clock & Date Section */
+        /* Clock area shrunk to 25% height */
         #clock-area { 
-            height: 35%; 
+            height: 25%; 
             display: flex; 
             flex-direction: column;
             align-items: center; 
@@ -33,10 +32,10 @@
             border-bottom: 2px solid #333; 
         }
 
-        #clock { font-size: 18vw; font-weight: bold; font-family: monospace; color: #00ff00; line-height: 1; }
-        #date { font-size: 2vw; font-weight: normal; font-family: monospace; color: #888; margin-top: 10px; text-transform: uppercase; }
+        #clock { font-size: 15vw; font-weight: bold; font-family: monospace; color: #00ff00; line-height: 1; }
+        /* Date slightly increased from 2vw to 3vw */
+        #date { font-size: 3vw; font-weight: normal; font-family: monospace; color: #888; margin-top: 5px; text-transform: uppercase; }
 
-        /* Drawing Section */
         #drawing-area { 
             flex-grow: 1; 
             position: relative; 
@@ -51,32 +50,32 @@
             z-index: 1; 
         }
 
-        /* Fixed positioning ensures it stays on top of the canvas stacking context */
         #controls { 
             position: fixed; 
-            bottom: 25px; 
-            right: 25px; 
+            bottom: 20px; 
+            right: 20px; 
             z-index: 9999; 
+            display: flex;
+            gap: 10px;
         }
 
         button { 
-            padding: 16px 28px; 
-            background: #cc0000; 
+            padding: 14px 22px; 
+            background: #333; 
             color: white; 
-            border: 2px solid #ffffff; 
-            border-radius: 10px; 
+            border: 1px solid #555; 
+            border-radius: 8px; 
             cursor: pointer; 
             font-weight: bold; 
-            font-size: 16px;
-            /* Modern mobile properties */
+            font-size: 14px;
             -webkit-appearance: none; 
             touch-action: manipulation;
             user-select: none;
         }
 
-        button:active {
-            background: #ff0000;
-        }
+        #clear-btn { background: #cc0000; border-color: #ff4444; }
+
+        button:active { opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -93,6 +92,7 @@
 </div>
 
 <div id="controls">
+    <button id="fullscreen-btn">Full Screen</button>
     <button id="clear-btn">Clear Notes</button>
 </div>
 
@@ -103,11 +103,9 @@
     const dateEl = document.getElementById('date');
     let drawing = false;
 
-    // --- Clock & Date Logic ---
     function updateDisplay() {
         const now = new Date();
         clockEl.textContent = now.toLocaleTimeString('en-AU', { hour12: false });
-
         const day = String(now.getDate()).padStart(2, '0');
         const month = now.toLocaleString('en-AU', { month: 'short' });
         const year = now.getFullYear();
@@ -116,7 +114,6 @@
     setInterval(updateDisplay, 1000);
     updateDisplay();
 
-    // --- Persistence & Drawing Logic ---
     function setupCanvasStyles() {
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 4;
@@ -138,31 +135,22 @@
     }
 
     function resize() {
-        // Capture current content before resizing
         const tempImage = canvas.toDataURL();
         canvas.width = canvas.offsetWidth;
         canvas.height = canvas.offsetHeight;
         setupCanvasStyles();
-        
         const img = new Image();
         img.onload = () => ctx.drawImage(img, 0, 0);
         img.src = tempImage;
     }
 
     window.addEventListener('resize', resize);
-    
-    // Initial Setup
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
     setupCanvasStyles();
     loadCanvas();
 
-    // Unified Pointer Events (Handles Mouse & Touch perfectly in Chrome)
-    function start(e) { 
-        drawing = true; 
-        draw(e); 
-    }
-
+    function start(e) { drawing = true; draw(e); }
     function stop() { 
         if (drawing) {
             drawing = false; 
@@ -173,11 +161,9 @@
 
     function draw(e) {
         if (!drawing) return;
-        
         const rect = canvas.getBoundingClientRect();
         const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
         const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
-
         ctx.lineTo(x, y);
         ctx.stroke();
         ctx.beginPath();
@@ -188,18 +174,25 @@
     window.addEventListener('pointermove', draw);
     window.addEventListener('pointerup', stop);
 
-    function clearCanvas() {
+    // Clear Logic
+    document.getElementById('clear-btn').addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
         if (confirm("Clear all notes?")) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             localStorage.removeItem('savedDrawing');
         }
-    }
+    });
 
-    // Button Logic using pointerdown to bypass 300ms click delays
-    const clearBtn = document.getElementById('clear-btn');
-    clearBtn.addEventListener('pointerdown', (e) => {
-        e.stopPropagation(); // Stop drawing from starting under the button
-        clearCanvas();
+    // Full Screen Logic
+    document.getElementById('fullscreen-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                alert(`Error: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
     });
 </script>
 

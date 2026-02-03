@@ -23,10 +23,10 @@
 
         /* Drawing Section */
         #drawing-area { flex-grow: 1; position: relative; cursor: crosshair; background: #121212; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; z-index: 1; }
         
-        #controls { position: absolute; bottom: 10px; right: 10px; z-index: 10; }
-        button { padding: 12px 24px; background: #cc0000; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #controls { position: absolute; bottom: 10px; right: 10px; z-index: 9999; touch-action: manipulation; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
+        button { padding: 12px 24px; background: #cc0000; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; -webkit-appearance: none; touch-action: manipulation; }
     </style>
 </head>
 <body>
@@ -38,7 +38,7 @@
     </div>
     <div id="drawing-area">
         <canvas id="canvas"></canvas>
-        <div id="controls"><button onclick="clearCanvas()">Clear Notes</button></div>
+        <div id="controls"><button id="clear-btn">Clear Notes</button></div>
     </div>
 </div>
 
@@ -139,6 +139,15 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             localStorage.removeItem('savedDrawing');
         }
+    }
+
+    // Touch-friendly handler for the Clear button (fixes Chrome on Android)
+    const clearBtn = document.getElementById('clear-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearCanvas);
+        clearBtn.addEventListener('touchend', (e) => { e.preventDefault(); clearCanvas(); });
+        // Prevent the canvas from receiving the touch when tapping the button
+        clearBtn.addEventListener('touchstart', (e) => e.stopPropagation());
     }
 </script>
 

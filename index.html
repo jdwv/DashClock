@@ -5,9 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Desk Dashboard</title>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #121212; color: white; font-family: sans-serif; }
-        #container { display: flex; flex-direction: column; height: 100vh; }
-        
+        /* Using dvh (Dynamic Viewport Height) to handle Chrome's auto-hiding address bar */
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            height: 100dvh; 
+            overflow: hidden; 
+            background: #121212; 
+            color: white; 
+            font-family: sans-serif; 
+        }
+
+        #container { 
+            display: flex; 
+            flex-direction: column; 
+            height: 100dvh; 
+        }
+
         /* Clock & Date Section */
         #clock-area { 
             height: 35%; 
@@ -18,15 +32,51 @@
             background: #1a1a1a; 
             border-bottom: 2px solid #333; 
         }
+
         #clock { font-size: 18vw; font-weight: bold; font-family: monospace; color: #00ff00; line-height: 1; }
         #date { font-size: 2vw; font-weight: normal; font-family: monospace; color: #888; margin-top: 10px; text-transform: uppercase; }
 
         /* Drawing Section */
-        #drawing-area { flex-grow: 1; position: relative; cursor: crosshair; background: #121212; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; z-index: 1; }
-        
-        #controls { position: absolute; bottom: 10px; right: 10px; z-index: 9999; touch-action: manipulation; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
-        button { padding: 12px 24px; background: #cc0000; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; -webkit-appearance: none; touch-action: manipulation; }
+        #drawing-area { 
+            flex-grow: 1; 
+            position: relative; 
+            background: #121212; 
+        }
+
+        canvas { 
+            display: block;
+            width: 100%; 
+            height: 100%; 
+            touch-action: none; 
+            z-index: 1; 
+        }
+
+        /* Fixed positioning ensures it stays on top of the canvas stacking context */
+        #controls { 
+            position: fixed; 
+            bottom: 25px; 
+            right: 25px; 
+            z-index: 9999; 
+        }
+
+        button { 
+            padding: 16px 28px; 
+            background: #cc0000; 
+            color: white; 
+            border: 2px solid #ffffff; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 16px;
+            /* Modern mobile properties */
+            -webkit-appearance: none; 
+            touch-action: manipulation;
+            user-select: none;
+        }
+
+        button:active {
+            background: #ff0000;
+        }
     </style>
 </head>
 <body>
@@ -36,10 +86,14 @@
         <div id="clock">00:00:00</div>
         <div id="date">01-Jan-1970</div>
     </div>
+
     <div id="drawing-area">
         <canvas id="canvas"></canvas>
-        <div id="controls"><button id="clear-btn">Clear Notes</button></div>
     </div>
+</div>
+
+<div id="controls">
+    <button id="clear-btn">Clear Notes</button>
 </div>
 
 <script>
@@ -52,17 +106,13 @@
     // --- Clock & Date Logic ---
     function updateDisplay() {
         const now = new Date();
-        
-        // Time: 24h format
         clockEl.textContent = now.toLocaleTimeString('en-AU', { hour12: false });
 
-        // Date: DD-MMM-YYYY (e.g., 03-Feb-2026)
         const day = String(now.getDate()).padStart(2, '0');
         const month = now.toLocaleString('en-AU', { month: 'short' });
         const year = now.getFullYear();
         dateEl.textContent = `${day}-${month}-${year}`;
     }
-    
     setInterval(updateDisplay, 1000);
     updateDisplay();
 
@@ -88,10 +138,12 @@
     }
 
     function resize() {
+        // Capture current content before resizing
         const tempImage = canvas.toDataURL();
         canvas.width = canvas.offsetWidth;
         canvas.height = canvas.offsetHeight;
         setupCanvasStyles();
+        
         const img = new Image();
         img.onload = () => ctx.drawImage(img, 0, 0);
         img.src = tempImage;
@@ -99,13 +151,18 @@
 
     window.addEventListener('resize', resize);
     
-    // Initial Run
+    // Initial Setup
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
     setupCanvasStyles();
     loadCanvas();
 
-    function start(e) { drawing = true; draw(e); }
+    // Unified Pointer Events (Handles Mouse & Touch perfectly in Chrome)
+    function start(e) { 
+        drawing = true; 
+        draw(e); 
+    }
+
     function stop() { 
         if (drawing) {
             drawing = false; 
@@ -113,10 +170,10 @@
             saveCanvas(); 
         }
     }
-    
+
     function draw(e) {
         if (!drawing) return;
-        e.preventDefault();
+        
         const rect = canvas.getBoundingClientRect();
         const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
         const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
@@ -127,12 +184,9 @@
         ctx.moveTo(x, y);
     }
 
-    canvas.addEventListener('mousedown', start);
-    canvas.addEventListener('mousemove', draw);
-    window.addEventListener('mouseup', stop);
-    canvas.addEventListener('touchstart', start);
-    canvas.addEventListener('touchmove', draw);
-    canvas.addEventListener('touchend', stop);
+    canvas.addEventListener('pointerdown', start);
+    window.addEventListener('pointermove', draw);
+    window.addEventListener('pointerup', stop);
 
     function clearCanvas() {
         if (confirm("Clear all notes?")) {
@@ -141,14 +195,12 @@
         }
     }
 
-    // Touch-friendly handler for the Clear button (fixes Chrome on Android)
+    // Button Logic using pointerdown to bypass 300ms click delays
     const clearBtn = document.getElementById('clear-btn');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', clearCanvas);
-        clearBtn.addEventListener('touchend', (e) => { e.preventDefault(); clearCanvas(); });
-        // Prevent the canvas from receiving the touch when tapping the button
-        clearBtn.addEventListener('touchstart', (e) => e.stopPropagation());
-    }
+    clearBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation(); // Stop drawing from starting under the button
+        clearCanvas();
+    });
 </script>
 
 </body>
